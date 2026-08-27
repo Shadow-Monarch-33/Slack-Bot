@@ -17,12 +17,12 @@ reminder_message = gets.chomp
 start_time = Time.parse(start_time_input)
 end_time = Time.parse(end_time_input)
 
-current_remainder_time = start_time
+current_reminder_time = start_time
 
-while current_remainder_time <= end_time
-  puts current_remainder_time.strftime("%H:%M")
+while current_reminder_time <= end_time
+  puts current_reminder_time.strftime("%H:%M")
 
-  current_remainder_time += interval_input * 60
+  current_reminder_time += interval_input * 60
 end
 
 Slack.configure do |config|
@@ -35,7 +35,6 @@ auth = client.auth_test
 
 puts "Connected as #{auth.user}"
 
-client.chat_postMessage(
-  channel: ENV["SLACK_CHANNEL_ID"],
-  text: reminder_message
-)
+require_relative "reminder_worker"
+
+ReminderWorker.perform_async(reminder_message)
