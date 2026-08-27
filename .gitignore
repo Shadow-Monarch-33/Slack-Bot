@@ -1,0 +1,15 @@
+# Environment variables
+.env
+
+# Bundler
+.bundle/
+
+# Ruby documentation
+/doc/
+
+# Logs and temporary files
+*.log
+tmp/
+
+# macOS
+.DS_Store
