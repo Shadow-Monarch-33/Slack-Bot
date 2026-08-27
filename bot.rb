@@ -1,6 +1,12 @@
 require "dotenv/load"
 require "time"
 
+start_time = nil
+end_time = nil
+interval_input = nil
+
+# Start Time
+
 loop do
   puts "What time should the reminders start? (HH:MM)"
 
@@ -19,8 +25,10 @@ loop do
   end
 end
 
+# End Time
+
 loop do
-  puts "What time should the reminders start? (HH:MM)"
+  puts "What time should the reminders end? (HH:MM)"
 
   end_time_input = gets.chomp
 
@@ -32,15 +40,17 @@ loop do
   begin
     end_time = Time.strptime(end_time_input, "%H:%M")
     break
+
   rescue ArgumentError
     puts "Please enter a valid time in HH:MM format."
   end
 end
 
 if end_time <= start_time
-  puts "End time must be after the start time."
-  exit
+  end_time += 24 * 60 * 60
 end
+
+# Interval Time
 
 loop do
   puts "How often should I remind you? (Minutes)"
@@ -49,10 +59,13 @@ loop do
 
   if interval_input > 0
     break
+
   else
     puts "Interval must be greater than 0."
   end
 end
+
+# Reminder Message
 
 puts "What should the reminder message be?"
 reminder_message = gets.chomp
@@ -62,6 +75,9 @@ require_relative "reminder_worker"
 current_reminder_time = start_time
 
 while current_reminder_time <= end_time
+
+  puts "Scheduling reminder for #{current_reminder_time}"
+
   ReminderWorker.perform_at(
     current_reminder_time,
     reminder_message
