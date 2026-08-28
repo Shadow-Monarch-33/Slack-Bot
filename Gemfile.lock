@@ -33,20 +33,31 @@ GEM
       ostruct
     hashie (5.0.0)
     multipart-post (2.4.1)
+    mustermann (3.0.4)
+      ruby2_keywords (~> 0.0.1)
     ostruct (0.6.3)
     rack (2.2.24)
+    rack-protection (3.2.0)
+      base64 (>= 0.1.0)
+      rack (~> 2.2, >= 2.2.4)
     redis (4.8.1)
     ruby2_keywords (0.0.5)
     sidekiq (6.5.12)
       connection_pool (>= 2.2.5, < 3)
       rack (~> 2.0)
       redis (>= 4.5.0, < 5)
+    sinatra (3.2.0)
+      mustermann (~> 3.0)
+      rack (~> 2.2, >= 2.2.4)
+      rack-protection (= 3.2.0)
+      tilt (~> 2.0)
     slack-ruby-client (1.0.0)
       faraday (>= 1.0)
       faraday_middleware
       gli
       hashie
       websocket-driver
+    tilt (2.9.0)
     websocket-driver (0.8.2)
       base64
       websocket-extensions (>= 0.1.0)
@@ -58,6 +69,7 @@ PLATFORMS
 DEPENDENCIES
   dotenv
   sidekiq
+  sinatra
   slack-ruby-client
 
 BUNDLED WITH
