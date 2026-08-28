@@ -2,6 +2,7 @@ require "sinatra"
 require "json"
 require "dotenv/load"
 require "slack-ruby-client"
+require "sidekiq/api"
 
 Slack.configure do |config|
   config.token = ENV["SLACK_BOT_TOKEN"]
@@ -11,6 +12,7 @@ client = Slack::Web::Client.new
 
 conversations = {}
 processed_events = {}
+user_jobs = {}
 
 get "/" do
   "Slack bot is alive"
@@ -48,6 +50,44 @@ post "/" do
       user = event["user"]
       message = event["text"]
       channel = event["channel"]
+
+      if message.downcase == "stop"
+
+        conversations.delete(user)
+
+        client.chat_postMessage(
+          channel: channel,
+          text: "Stopped all currently set reminders"
+        )
+
+        puts "USER JOBS:"
+        puts user_jobs[user].inspect
+
+        scheduled_jobs = Sidekiq::ScheduledSet.new
+
+        puts "SCHEDULED JOBS:"
+        scheduled_jobs.each do |scheduled_job|
+          puts scheduled_job.jid
+        end
+
+        user_jobs[user]&.each do |job_id|
+
+          puts "TRYING TO DELETE: #{job_id}"
+
+          job = scheduled_jobs.find do |schedules_job|
+            schedules_job.jid == job_id
+          end
+
+          puts "FOUND: #{job.inspect}"
+
+          job.delete if job
+
+        end
+
+        user_jobs.delete(user)
+
+        return "OK"
+      end
 
       if conversations[user].nil?
 
@@ -163,17 +203,30 @@ post "/" do
           end_time += 24 * 60 * 60
         end
 
-        current_reminder_time = start_time + 10
+        current_time = Time.now.strftime("%H:%M")
+
+        if start_time_input < current_time
+          start_time += 24 * 60 * 60
+          end_time += 24 * 60 * 60
+        end
 
         require_relative "reminder_worker"
 
+        user_jobs[user] ||= []
+
+        current_reminder_time = start_time + 10
+
         while current_reminder_time <= end_time
 
-          ReminderWorker.perform_at(
+          puts "SCHEDULING: #{current_reminder_time.strftime("%H:%M:%S")}"
+
+          job_id = ReminderWorker.perform_at(
             current_reminder_time,
             channel,
             message_input
           )
+
+          user_jobs[user] << job_id
 
           current_reminder_time += interval_time * 60
         end
