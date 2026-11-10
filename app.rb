@@ -3,6 +3,8 @@ require "json"
 require "dotenv/load"
 require "slack-ruby-client"
 require "sidekiq/api"
+require "time"
+require "openssl"
 
 Slack.configure do |config|
   config.token = ENV["SLACK_BOT_TOKEN"]
@@ -16,6 +18,31 @@ user_jobs = {}
 
 get "/" do
   "Slack bot is alive"
+end
+
+before do
+  if request.post?
+    body = request.body.read
+    request.body.rewind
+
+    timestamp = request.env["HTTP_X_SLACK_REQUEST_TIMESTAMP"].to_s
+    signature = request.env["HTTP_X_SLACK_SIGNATURE"].to_s
+
+    halt 401, "Unauthorized" unless timestamp.match?(/\A\d+\z/)
+    halt 401, "Unauthorized" if (Time.now.to_i - timestamp.to_i).abs > 300
+
+    base = "v0:#{timestamp}:#{body}"
+    expected = "v0=" + OpenSSL::HMAC.hexdigest(
+      "SHA256",
+      ENV.fetch("SLACK_SIGNING_SECRET"),
+      base
+    )
+
+    valid = expected.bytesize == signature.bytesize &&
+            Rack::Utils.secure_compare(expected, signature)
+
+    halt 401, "Unauthorized" unless valid
+  end
 end
 
 post "/" do
@@ -35,13 +62,20 @@ post "/" do
 
     if processed_events[payload["event_id"]]
       puts "DUPLICATE IGNORED"
-      return "OK"
+      halt 200, "OK"
     end
 
     processed_events[payload["event_id"]] = true
     puts "NEW EVENT"
 
     event = payload["event"]
+
+    unless event["type"] == "message" &&
+          event["channel_type"] == "im" &&
+          event["subtype"].nil? &&
+          event["text"].is_a?(String)
+      halt 200, "OK"
+    end
 
     if event["bot_id"]
       "OK"
@@ -86,7 +120,7 @@ post "/" do
 
         user_jobs.delete(user)
 
-        return "OK"
+        halt 200, "OK"
       end
 
       if conversations[user].nil?
@@ -166,9 +200,9 @@ post "/" do
 
       elsif conversations[user][:step] == "interval"
 
-        interval = message.to_f
-
-        if interval > 0
+        interval = Float(message, exception: false)
+        
+        if interval && interval >= 1 && interval <= 1440
 
           conversations[user][:interval] = interval
           conversations[user][:step] = "message"
@@ -214,7 +248,7 @@ post "/" do
 
         user_jobs[user] ||= []
 
-        current_reminder_time = start_time + 10
+        current_reminder_time = start_time
 
         while current_reminder_time <= end_time
 
